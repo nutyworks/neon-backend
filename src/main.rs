@@ -5,11 +5,12 @@ extern crate diesel;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use dotenvy::dotenv;
+use rocket::Response;
+use rocket::fairing::{Fairing, Info, Kind};
 use serde_json::{json, Value};
 use rocket::{http::Status, Request};
 use std::env;
-use rocket::http::Method;
-use rocket_cors::{AllowedOrigins, CorsOptions};
+use rocket::http::Header;
 
 use routes::artists::{
     delete_artist, delete_circle_artist, get_artist_by_id, get_artists, patch_artist, post_artist,
@@ -42,6 +43,31 @@ mod error_handler;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 
+pub struct CORS;
+
+#[options("/<_..>")]
+fn all_options() {
+    /* Intentionally left empty */
+}
+
+#[rocket::async_trait]
+impl Fairing for CORS {
+    fn info(&self) -> Info {
+        Info {
+            name: "Attaching CORS headers to responses",
+            kind: Kind::Response
+        }
+    }
+
+    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
+        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Methods", "POST, GET, PATCH, DELETE, OPTIONS"));
+        response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+    }
+}
+
+
 #[launch]
 fn rocket() -> _ {
     dotenv().ok();
@@ -52,19 +78,9 @@ fn rocket() -> _ {
         .build(manager)
         .expect("Failed to create database pool");
 
-    let cors = CorsOptions::default()
-        .allowed_origins(AllowedOrigins::all())
-        .allowed_methods(
-            vec![Method::Get, Method::Post, Method::Patch, Method::Delete]
-                .into_iter()
-                .map(From::from)
-                .collect(),
-        )
-        .allow_credentials(true);
-
     rocket::build()
         .manage(pool)
-        .attach(cors.to_cors().unwrap())
+        .attach(CORS)
         .mount(
         "/",
         routes![
@@ -115,6 +131,7 @@ fn rocket() -> _ {
             patch_link,
             delete_link,
             patch_bundle_goods,
+            all_options,
         ],
     )
     .register("/", catchers![catch_default])
