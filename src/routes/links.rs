@@ -1,0 +1,130 @@
+use crate::error_handler::{CustomError, handle_error, ErrorInfo};
+use crate::models::{Link, LinkTypeEnum};
+use crate::DbPool;
+
+use diesel::prelude::*;
+use rocket::http::Status;
+use rocket::response::status::{Created, Custom};
+use rocket::serde::json::Json;
+use serde::Deserialize;
+
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::circle_links)]
+pub struct NewCircleLink {
+    pub circle_id: i32,
+    pub link_id: i32,
+}
+
+#[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
+#[diesel(table_name = crate::schema::links)]
+pub struct NewLink {
+    #[serde(rename = "type")]
+    pub type_: LinkTypeEnum,
+    pub url: String,
+}
+
+#[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
+#[diesel(table_name = crate::schema::links)]
+pub struct UpdateLink {
+    #[serde(rename = "type")]
+    pub type_: Option<LinkTypeEnum>,
+    pub url: Option<String>,
+}
+
+#[post("/circles/<circle_id>/links", format = "json", data = "<new_link>")]
+pub fn post_circle_link(
+    circle_id: i32,
+    new_link: Json<NewLink>,
+    pool: &rocket::State<DbPool>,
+) -> Result<Created<Json<Link>>, CustomError> {
+    use crate::schema::circle_links;
+    use crate::schema::links;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    let link = diesel::insert_into(links::dsl::links)
+        .values(new_link.into_inner())
+        .get_result::<Link>(&mut conn)
+        .map_err(handle_error)?;
+
+    diesel::insert_into(circle_links::dsl::circle_links)
+        .values(NewCircleLink {
+            circle_id,
+            link_id: link.id,
+        })
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    Ok(Created::new(format!("/links/{}", link.id)).body(Json(link)))
+}
+
+#[get("/links")]
+pub fn get_links(pool: &rocket::State<DbPool>) -> Result<Json<Vec<Link>>, CustomError> {
+    use crate::schema::links::dsl::links;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    links
+        .load::<Link>(&mut conn)
+        .map(Json)
+        .map_err(handle_error)
+}
+
+#[get("/links/<link_id>")]
+pub fn get_link_by_id(
+    link_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<Json<Link>, CustomError> {
+    use crate::schema::links::dsl::links;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    links.find(link_id)
+        .first(&mut conn)
+        .map(Json)
+        .map_err(handle_error)
+}
+
+#[patch("/links/<link_id>", format = "json", data = "<link_request>")]
+pub fn patch_link(
+    link_id: i32,
+    link_request: Json<NewLink>,
+    pool: &rocket::State<DbPool>,
+) -> Result<Json<Link>, CustomError> {
+    use crate::schema::links::dsl::*;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    diesel::update(links.find(link_id))
+        .set(link_request.into_inner())
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    links
+        .find(link_id)
+        .first(&mut conn)
+        .map(Json)
+        .map_err(handle_error)
+}
+
+#[delete("/links/<link_id>")]
+pub fn delete_link(link_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+    use crate::schema::circle_links;
+    use crate::schema::links::dsl::*;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    diesel::delete(circle_links::dsl::circle_links.filter(circle_links::dsl::link_id.eq(link_id)))
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    let size = diesel::delete(links.find(link_id))
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    if size == 0 {
+        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+    } else {
+        Ok(())
+    }
+}
