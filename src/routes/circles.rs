@@ -20,12 +20,24 @@ pub fn get_circles(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    circles::table
+    let mut query = circles::table
         .left_join(circle_artists::table.on(circles::id.eq(circle_artists::circle_id)))
         .left_join(artists::table.on(circle_artists::artist_id.eq(artists::id)))
-        .filter(circles::name.like(format!("%{}%", name.unwrap_or("".into()))))
-        .filter(artists::name.like(format!("%{}%", artist_name.unwrap_or("".into()))))
-        .filter(circles::location.like(format!("%{}%", location.unwrap_or("".into()))))
+        .into_boxed();
+
+    if let Some(name) = name {
+        query = query.filter(circles::name.like(format!("%{}%", name)));
+    }
+
+    if let Some(artist_name) = artist_name {
+        query = query.filter(artists::name.like(format!("%{}%", artist_name)));
+    }
+
+    if let Some(location) = location {
+        query = query.filter(circles::location.like(format!("%{}%", location)));
+    }
+
+    query
         .select(circles::all_columns)
         .distinct()
         .load::<Circle>(&mut conn)
