@@ -8,6 +8,8 @@ use dotenvy::dotenv;
 use serde_json::{json, Value};
 use rocket::{http::Status, Request};
 use std::env;
+use rocket::http::Method;
+use rocket_cors::{AllowedOrigins, CorsOptions};
 
 use routes::artists::{
     delete_artist, delete_circle_artist, get_artist_by_id, get_artists, patch_artist, post_artist,
@@ -50,7 +52,20 @@ fn rocket() -> _ {
         .build(manager)
         .expect("Failed to create database pool");
 
-    rocket::build().manage(pool).mount(
+    let cors = CorsOptions::default()
+        .allowed_origins(AllowedOrigins::all())
+        .allowed_methods(
+            vec![Method::Get, Method::Post, Method::Patch, Method::Delete]
+                .into_iter()
+                .map(From::from)
+                .collect(),
+        )
+        .allow_credentials(true);
+
+    rocket::build()
+        .manage(pool)
+        .attach(cors.to_cors().unwrap())
+        .mount(
         "/",
         routes![
             get_artists,
