@@ -20,6 +20,7 @@ pub enum LinkTypeEnum {
     netorder,
     notice,
     prepayment,
+    demand,
 }
 
 #[derive(Queryable, Serialize)]
