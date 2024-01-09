@@ -49,6 +49,7 @@ pub struct Bundle {
     pub name: Option<String>,
     pub price: Option<i32>,
     pub description: Option<String>,
+    #[serde(rename = "type")]
     pub type_: BundleTypeEnum,
     pub count: i32,
 }
@@ -96,6 +97,7 @@ pub struct Artist {
 #[serde(crate = "rocket::serde")]
 pub struct Link {
     pub id: i32,
+    #[serde(rename = "type")]
     pub type_: LinkTypeEnum,
     pub url: String,
 }
