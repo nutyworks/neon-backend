@@ -58,13 +58,27 @@ pub fn post_circle_link(
     Ok(Created::new(format!("/links/{}", link.id)).body(Json(link)))
 }
 
-#[get("/links")]
-pub fn get_links(pool: &rocket::State<DbPool>) -> Result<Json<Vec<Link>>, CustomError> {
-    use crate::schema::links::dsl::links;
+#[get("/links?<circle_id>")]
+pub fn get_links(
+    circle_id: Option<i32>,
+    pool: &rocket::State<DbPool>,
+) -> Result<Json<Vec<Link>>, CustomError> {
+    use crate::schema::links;
+    use crate::schema::circle_links;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    links
+    let mut query = links::table
+        .left_join(circle_links::table.on(links::id.eq(circle_links::link_id)))
+        .into_boxed();
+
+    if let Some(circle_id) = circle_id {
+        query = query.filter(circle_links::circle_id.eq(circle_id));
+    }
+
+    query
+        .select(links::all_columns)
+        .distinct()
         .load::<Link>(&mut conn)
         .map(Json)
         .map_err(handle_error)
