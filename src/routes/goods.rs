@@ -1,4 +1,4 @@
-use crate::error_handler::{CustomError, handle_error, ErrorInfo};
+use crate::error_handler::{handle_error, CustomError, ErrorInfo};
 use crate::models::Good;
 use crate::DbPool;
 
@@ -58,7 +58,10 @@ pub fn post_circle_goods(
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(Created::new(format!("/goods/{}", good.id)).body(Json(good)))
     }
@@ -73,11 +76,11 @@ pub fn get_goods(
     circle_id: Option<i32>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Vec<Good>>, CustomError> {
+    use crate::schema::characters;
+    use crate::schema::circle_goods;
     use crate::schema::goods;
     use crate::schema::goods_character;
-    use crate::schema::characters;
     use crate::schema::goods_in_bundle;
-    use crate::schema::circle_goods;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -132,7 +135,8 @@ pub fn get_goods_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    goods.find(goods_id)
+    goods
+        .find(goods_id)
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
@@ -161,26 +165,27 @@ pub fn patch_goods(
 }
 
 #[delete("/goods/<goods_id>")]
-pub fn delete_goods(
-    goods_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
+pub fn delete_goods(goods_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::circle_goods;
     use crate::schema::goods::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
     diesel::delete(
-        circle_goods::dsl::circle_goods.filter(circle_goods::dsl::goods_id.eq(goods_id)))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_goods::dsl::circle_goods.filter(circle_goods::dsl::goods_id.eq(goods_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     let size = diesel::delete(goods.find(goods_id))
         .execute(&mut conn)
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }
@@ -237,15 +242,19 @@ pub fn delete_good_character(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    let size= diesel::delete(
+    let size = diesel::delete(
         goods_character::dsl::goods_character
             .filter(goods_character::dsl::goods_id.eq(goods_id))
-            .filter(goods_character::dsl::character_id.eq(character_id)))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+            .filter(goods_character::dsl::character_id.eq(character_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

@@ -1,5 +1,5 @@
-use crate::error_handler::{CustomError, handle_error, ErrorInfo};
-use crate::models::{Bundle, BundleTypeEnum, BundleGoods};
+use crate::error_handler::{handle_error, CustomError, ErrorInfo};
+use crate::models::{Bundle, BundleGoods, BundleTypeEnum};
 use crate::DbPool;
 
 use diesel::prelude::*;
@@ -68,7 +68,7 @@ pub fn post_circle_bundle(
 #[get("/bundles?<circle_id>")]
 pub fn get_bundles(
     circle_id: Option<i32>,
-    pool: &rocket::State<DbPool>
+    pool: &rocket::State<DbPool>,
 ) -> Result<Json<Vec<Bundle>>, CustomError> {
     use crate::schema::bundles;
     use crate::schema::circle_bundles;
@@ -100,7 +100,9 @@ pub fn get_bundle_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    let bundle = bundles.find(bundle_id).first(&mut conn)
+    let bundle = bundles
+        .find(bundle_id)
+        .first(&mut conn)
         .map(Json)
         .map_err(handle_error)?;
 
@@ -130,26 +132,27 @@ pub fn patch_bundle(
 }
 
 #[delete("/bundles/<bundle_id>")]
-pub fn delete_bundle(
-    bundle_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
+pub fn delete_bundle(bundle_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::bundles::dsl::*;
     use crate::schema::circle_bundles;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
     diesel::delete(
-        circle_bundles::dsl::circle_bundles.filter(circle_bundles::dsl::bundle_id.eq(bundle_id)))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_bundles::dsl::circle_bundles.filter(circle_bundles::dsl::bundle_id.eq(bundle_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     let size = diesel::delete(bundles.find(bundle_id))
         .execute(&mut conn)
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }
@@ -201,7 +204,11 @@ pub fn post_bundle_goods(
     )))
 }
 
-#[patch("/bundles/<bundle_id>/goods/<goods_id>", format = "json", data = "<update_bundle_goods>")]
+#[patch(
+    "/bundles/<bundle_id>/goods/<goods_id>",
+    format = "json",
+    data = "<update_bundle_goods>"
+)]
 pub fn patch_bundle_goods(
     bundle_id: i32,
     goods_id: i32,
@@ -215,10 +222,11 @@ pub fn patch_bundle_goods(
     diesel::update(
         goods_in_bundle::dsl::goods_in_bundle
             .filter(goods_in_bundle::dsl::bundle_id.eq(bundle_id))
-            .filter(goods_in_bundle::dsl::goods_id.eq(goods_id)))
-        .set(update_bundle_goods.into_inner())
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+            .filter(goods_in_bundle::dsl::goods_id.eq(goods_id)),
+    )
+    .set(update_bundle_goods.into_inner())
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     let updated_goods_in_bundle = goods_in_bundle::dsl::goods_in_bundle
         .filter(goods_in_bundle::dsl::bundle_id.eq(bundle_id))
@@ -242,12 +250,16 @@ pub fn delete_bundle_goods(
     let size = diesel::delete(
         goods_in_bundle::dsl::goods_in_bundle
             .filter(goods_in_bundle::dsl::bundle_id.eq(bundle_id))
-            .filter(goods_in_bundle::dsl::goods_id.eq(goods_id)))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+            .filter(goods_in_bundle::dsl::goods_id.eq(goods_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

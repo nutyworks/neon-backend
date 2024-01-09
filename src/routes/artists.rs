@@ -76,9 +76,10 @@ pub fn delete_circle_artist(
     diesel::delete(
         circle_artists::dsl::circle_artists
             .filter(circle_artists::dsl::circle_id.eq(circle_id))
-            .filter(circle_artists::dsl::artist_id.eq(artist_id)))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+            .filter(circle_artists::dsl::artist_id.eq(artist_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     Ok(())
 }
@@ -104,7 +105,7 @@ pub fn post_artist(
 pub fn get_artists(
     circle_id: Option<i32>,
     name: Option<String>,
-    pool: &rocket::State<DbPool>
+    pool: &rocket::State<DbPool>,
 ) -> Result<Json<Vec<Artist>>, CustomError> {
     use crate::schema::artists;
     use crate::schema::circle_artists;
@@ -169,10 +170,7 @@ pub fn patch_artist(
 }
 
 #[delete("/artists/<artist_id>")]
-pub fn delete_artist(
-    artist_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
+pub fn delete_artist(artist_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::artists::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
@@ -182,7 +180,10 @@ pub fn delete_artist(
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

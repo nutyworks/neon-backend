@@ -62,7 +62,8 @@ pub fn get_category_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    let category = categories.find(category_id)
+    let category = categories
+        .find(category_id)
         .first(&mut conn)
         .map_err(handle_error)?;
 
@@ -96,10 +97,7 @@ pub fn patch_category(
 }
 
 #[delete("/categories/<category_id>")]
-pub fn delete_category(
-    category_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
+pub fn delete_category(category_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::categories::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
@@ -109,7 +107,10 @@ pub fn delete_category(
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

@@ -1,4 +1,4 @@
-use crate::error_handler::{CustomError, handle_error, ErrorInfo};
+use crate::error_handler::{handle_error, CustomError, ErrorInfo};
 use crate::models::{Link, LinkTypeEnum};
 use crate::DbPool;
 
@@ -63,8 +63,8 @@ pub fn get_links(
     circle_id: Option<i32>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Vec<Link>>, CustomError> {
-    use crate::schema::links;
     use crate::schema::circle_links;
+    use crate::schema::links;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -93,7 +93,8 @@ pub fn get_link_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    links.find(link_id)
+    links
+        .find(link_id)
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
@@ -137,7 +138,10 @@ pub fn delete_link(link_id: i32, pool: &rocket::State<DbPool>) -> Result<(), Cus
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

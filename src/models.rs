@@ -7,7 +7,7 @@ use serde::Deserialize;
 #[ExistingTypePath = "crate::schema::sql_types::BundleType"]
 pub enum BundleTypeEnum {
     random,
-    select
+    select,
 }
 
 #[allow(non_camel_case_types)]

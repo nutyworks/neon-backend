@@ -1,4 +1,4 @@
-use crate::error_handler::{CustomError, handle_error, ErrorInfo};
+use crate::error_handler::{handle_error, CustomError, ErrorInfo};
 use crate::{models::Circle, DbPool};
 
 use diesel::prelude::*;
@@ -14,9 +14,9 @@ pub fn get_circles(
     location: Option<String>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Vec<Circle>>, CustomError> {
-    use crate::schema::circles;
-    use crate::schema::circle_artists;
     use crate::schema::artists;
+    use crate::schema::circle_artists;
+    use crate::schema::circles;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -54,7 +54,8 @@ pub fn get_circle_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    circles::dsl::circles.find(circle_id)
+    circles::dsl::circles
+        .find(circle_id)
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
@@ -85,7 +86,7 @@ pub fn post_circle(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    let circle= diesel::insert_into(circles::dsl::circles)
+    let circle = diesel::insert_into(circles::dsl::circles)
         .values(new_circle.into_inner())
         .get_result::<Circle>(&mut conn)
         .map_err(handle_error)?;
@@ -116,52 +117,48 @@ pub fn patch_circle(
 }
 
 #[delete("/circles/<circle_id>")]
-pub fn delete_circle(
-    circle_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
-    use crate::schema::circles::dsl::*;
+pub fn delete_circle(circle_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::circle_artists;
     use crate::schema::circle_bundles;
     use crate::schema::circle_goods;
     use crate::schema::circle_links;
+    use crate::schema::circles::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
     diesel::delete(
-        circle_artists::dsl::circle_artists.filter(
-            circle_artists::dsl::circle_id.eq(circle_id)
-        ))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_artists::dsl::circle_artists.filter(circle_artists::dsl::circle_id.eq(circle_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     diesel::delete(
-        circle_bundles::dsl::circle_bundles.filter(
-            circle_bundles::dsl::circle_id.eq(circle_id)
-        ))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_bundles::dsl::circle_bundles.filter(circle_bundles::dsl::circle_id.eq(circle_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     diesel::delete(
-        circle_goods::dsl::circle_goods.filter(
-            circle_goods::dsl::circle_id.eq(circle_id)
-        ))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_goods::dsl::circle_goods.filter(circle_goods::dsl::circle_id.eq(circle_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     diesel::delete(
-        circle_links::dsl::circle_links.filter(
-            circle_links::dsl::circle_id.eq(circle_id)
-        ))
-        .execute(&mut conn)
-        .map_err(handle_error)?;
+        circle_links::dsl::circle_links.filter(circle_links::dsl::circle_id.eq(circle_id)),
+    )
+    .execute(&mut conn)
+    .map_err(handle_error)?;
 
     let size = diesel::delete(circles.find(circle_id))
         .execute(&mut conn)
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

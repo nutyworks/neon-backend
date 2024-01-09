@@ -83,18 +83,14 @@ pub fn patch_reference(
         .execute(&mut conn)
         .map_err(handle_error)?;
 
-    refs
-        .find(ref_id)
+    refs.find(ref_id)
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
 }
 
 #[delete("/references/<ref_id>")]
-pub fn delete_reference(
-    ref_id: i32,
-    pool: &rocket::State<DbPool>,
-) -> Result<(), CustomError> {
+pub fn delete_reference(ref_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
     use crate::schema::refs::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
@@ -104,7 +100,10 @@ pub fn delete_reference(
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }

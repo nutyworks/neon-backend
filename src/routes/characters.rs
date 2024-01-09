@@ -1,4 +1,4 @@
-use crate::error_handler::{CustomError, handle_error, ErrorInfo};
+use crate::error_handler::{handle_error, CustomError, ErrorInfo};
 use crate::models::Character;
 use crate::DbPool;
 use diesel::prelude::*;
@@ -84,7 +84,8 @@ pub fn get_character_by_id(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    characters.find(character_id)
+    characters
+        .find(character_id)
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
@@ -130,7 +131,10 @@ pub fn delete_character(
         .map_err(handle_error)?;
 
     if size == 0 {
-        Err(Custom(Status::NotFound, Json(ErrorInfo::new("not_found".to_string()))))
+        Err(Custom(
+            Status::NotFound,
+            Json(ErrorInfo::new("not_found".to_string())),
+        ))
     } else {
         Ok(())
     }
