@@ -90,7 +90,7 @@ pub struct Category {
 pub struct Artist {
     pub id: i32,
     pub name: String,
-    pub url: Option<String>,
+    pub account_url: Option<String>,
 }
 
 #[derive(Queryable, Serialize)]
