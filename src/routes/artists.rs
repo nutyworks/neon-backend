@@ -100,13 +100,32 @@ pub fn post_artist(
     Ok(Created::new(format!("/artists/{}", artist.id)).body(Json(artist)))
 }
 
-#[get("/artists")]
-pub fn get_artists(pool: &rocket::State<DbPool>) -> Result<Json<Vec<Artist>>, CustomError> {
-    use crate::schema::artists::dsl::artists;
+#[get("/artists?<circle_id>&<name>")]
+pub fn get_artists(
+    circle_id: Option<i32>,
+    name: Option<String>,
+    pool: &rocket::State<DbPool>
+) -> Result<Json<Vec<Artist>>, CustomError> {
+    use crate::schema::artists;
+    use crate::schema::circle_artists;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    artists
+    let mut query = artists::table
+        .left_join(circle_artists::table.on(artists::id.eq(circle_artists::artist_id)))
+        .into_boxed();
+
+    if let Some(circle_id) = circle_id {
+        query = query.filter(circle_artists::circle_id.eq(circle_id));
+    }
+
+    if let Some(name) = name {
+        query = query.filter(artists::name.like(format!("%{}%", name)));
+    }
+
+    query
+        .select(artists::all_columns)
+        .distinct()
         .load::<Artist>(&mut conn)
         .map(Json)
         .map_err(handle_error)
