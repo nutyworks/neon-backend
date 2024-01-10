@@ -135,6 +135,7 @@ diesel::table! {
         type_ -> LinkType,
         #[max_length = 255]
         url -> Varchar,
+        name -> Nullable<Varchar>,
     }
 }
 

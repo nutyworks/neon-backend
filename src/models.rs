@@ -100,4 +100,5 @@ pub struct Link {
     #[serde(rename = "type")]
     pub type_: LinkTypeEnum,
     pub url: String,
+    pub name: Option<String>,
 }

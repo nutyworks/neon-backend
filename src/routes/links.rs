@@ -21,6 +21,7 @@ pub struct NewLink {
     #[serde(rename = "type")]
     pub type_: LinkTypeEnum,
     pub url: String,
+    pub name: Option<String>,
 }
 
 #[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
