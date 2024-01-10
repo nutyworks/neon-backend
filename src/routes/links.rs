@@ -30,6 +30,7 @@ pub struct UpdateLink {
     #[serde(rename = "type")]
     pub type_: Option<LinkTypeEnum>,
     pub url: Option<String>,
+    pub name: Option<String>,
 }
 
 #[post("/circles/<circle_id>/links", format = "json", data = "<new_link>")]
@@ -104,7 +105,7 @@ pub fn get_link_by_id(
 #[patch("/links/<link_id>", format = "json", data = "<link_request>")]
 pub fn patch_link(
     link_id: i32,
-    link_request: Json<NewLink>,
+    link_request: Json<UpdateLink>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Link>, CustomError> {
     use crate::schema::links::dsl::*;
