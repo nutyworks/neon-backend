@@ -27,7 +27,7 @@ pub enum LinkTypeEnum {
 #[serde(crate = "rocket::serde")]
 pub struct Circle {
     pub id: i32,
-    pub name: String,
+    pub name: Option<String>,
     pub description: Option<String>,
     pub location: Option<String>,
 }

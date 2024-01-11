@@ -90,7 +90,7 @@ diesel::table! {
     circles (id) {
         id -> Int4,
         #[max_length = 255]
-        name -> Varchar,
+        name -> Nullable<Varchar>,
         description -> Nullable<Text>,
         #[max_length = 255]
         location -> Nullable<Varchar>,

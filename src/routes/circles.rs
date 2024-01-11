@@ -64,7 +64,7 @@ pub fn get_circle_by_id(
 #[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
 #[diesel(table_name = crate::schema::circles)]
 pub struct NewCircle {
-    pub name: String,
+    pub name: Option<String>,
     pub description: Option<String>,
     pub location: Option<String>,
 }
