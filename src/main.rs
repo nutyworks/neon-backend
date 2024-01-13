@@ -80,9 +80,8 @@ fn rocket() -> _ {
         .build(manager)
         .expect("Failed to create database pool");
 
-    rocket::build()
+    let rocket = rocket::build()
         .manage(pool)
-        .attach(CORS)
         .mount(
             "/",
             routes![
@@ -136,7 +135,13 @@ fn rocket() -> _ {
                 all_options,
             ],
         )
-        .register("/", catchers![catch_default])
+        .register("/", catchers![catch_default]);
+
+    if cfg!(debug_assertions) {
+        rocket.attach(CORS)
+    } else {
+        rocket
+    }
 }
 
 #[catch(default)]
