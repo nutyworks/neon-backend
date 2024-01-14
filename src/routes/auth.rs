@@ -257,7 +257,7 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
             };
         let hashed_validator = sha256::digest(validator);
 
-        let token = match tokens::table
+        let token: Token = match tokens::table
             .filter(tokens::selector.eq(selector))
             .select(tokens::all_columns)
             .first::<Token>(&mut conn)
@@ -270,6 +270,15 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
                 ))
             }
         };
+
+        if let Some(expires) = token.expires {
+            if expires < SystemTime::now() {
+                return rocket::request::Outcome::Error((
+                    Status::Unauthorized,
+                    AuthorizationError::TokenInvalid,
+                ));
+            }
+        }
 
         if token.hashed_validator != hashed_validator {
             return rocket::request::Outcome::Error((
