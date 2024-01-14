@@ -139,7 +139,7 @@ pub struct User {
     pub role: RoleTypeEnum,
 }
 
-#[derive(Queryable, Debug)]
+#[derive(Queryable, Serialize)]
 pub struct AuthenticatedUser {
     pub id: i32,
     pub handle: String,

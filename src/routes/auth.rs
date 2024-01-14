@@ -459,3 +459,10 @@ pub fn delete_me(
 
     Ok(json!({ "success": true }))
 }
+
+#[get("/users/me")]
+pub fn get_me(
+    user: AuthenticatedUser,
+) -> Result<Json<AuthenticatedUser>, CustomError> {
+    Ok(Json(user))
+}
