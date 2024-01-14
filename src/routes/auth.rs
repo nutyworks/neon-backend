@@ -255,16 +255,13 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
 
         dotenv().ok();
 
-        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL not set");
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let mut conn = match manager.connect() {
-            Ok(conn) => conn,
-            Err(_) => {
-                return rocket::request::Outcome::Error((
+        let pool = request.guard::<&rocket::State<DbPool>>().await;
+        let mut conn = match pool.succeeded() {
+            Some(pool) => pool.get().expect("Failed to get database connection"),
+            None => return rocket::request::Outcome::Error((
                     Status::InternalServerError,
                     AuthorizationError::DatabaseConnection,
-                ))
-            }
+            )),
         };
 
         let token = match request.cookies().get("token") {
