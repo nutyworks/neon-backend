@@ -32,6 +32,7 @@ pub struct NewUser {
     pub handle: String,
     pub nickname: String,
     pub password: String,
+    pub email: String,
 }
 
 impl NewUser {
@@ -46,6 +47,7 @@ impl NewUser {
             handle: self.handle.clone(),
             nickname: self.nickname.clone(),
             password: password_hash,
+            email: self.email.clone(),
         })
     }
 }

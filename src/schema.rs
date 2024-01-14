@@ -186,6 +186,8 @@ diesel::table! {
         #[max_length = 16]
         twitter_id -> Nullable<Varchar>,
         role -> RoleType,
+        #[max_length = 255]
+        email -> Varchar,
     }
 }
 

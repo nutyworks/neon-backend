@@ -127,6 +127,7 @@ pub struct UserSensitive {
     pub password: String,
     pub twitter_id: Option<String>,
     pub role: RoleTypeEnum,
+    pub email: String,
 }
 
 #[derive(Serialize)]
