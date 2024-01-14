@@ -95,6 +95,31 @@ fn generate_random_string(len: usize) -> String {
         .collect()
 }
 
+fn validate_handle(handle: &str) -> Result<(), CustomError> {
+    if handle.is_empty() {
+        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Handle too short".into()))))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_password(password: &str) -> Result<(), CustomError> {
+    if password.len() >= 8 {
+        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Password should be equal to or longer than 8".into()))))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_nickname(nickname: &str) -> Result<(), CustomError> {
+    if nickname.is_empty() {
+        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Nickname too short".into()))))
+    } else {
+        Ok(())
+    }
+}
+
+
 #[get("/user/check_handle?<handle>")]
 pub fn check_handle(handle: String, pool: &rocket::State<DbPool>) -> Result<Value, CustomError> {
     let mut conn = pool.get().expect("Failed to get database connection");
@@ -110,6 +135,10 @@ pub fn add_user(
     use crate::schema::users;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    validate_handle(&new_user.handle)?;
+    validate_password(&new_user.password)?;
+    validate_nickname(&new_user.nickname)?;
 
     if is_handle_exists(&new_user.handle, &mut conn)? {
         return Err(Custom(
@@ -328,7 +357,105 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
     }
 }
 
-#[get("/user/test")]
-pub fn test(user: AuthenticatedUser) -> String {
-    format!("{:?}", user)
+#[derive(Deserialize)]
+pub struct UpdateUser {
+    nickname: Option<String>,
+    email: Option<String>,
+    password: String,
+    new_password: Option<String>,
+}
+
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::users)]
+pub struct UpdateUserHashed {
+    nickname: Option<String>,
+    email: Option<String>,
+    password: Option<String>,
+}
+
+impl UpdateUser {
+    fn hash_password(&self) -> Result<UpdateUserHashed, argon2::password_hash::Error> {
+        if let Some(new_password) = &self.new_password {
+            let argon2 = Argon2::default();
+            let salt = SaltString::generate(&mut OsRng);
+            let password_hash = argon2
+                .hash_password(new_password.as_bytes(), &salt)?
+                .to_string();
+
+            Ok(UpdateUserHashed {
+                nickname: self.nickname.clone(),
+                password: Some(password_hash),
+                email: self.email.clone(),
+            })
+        } else {
+            Ok(UpdateUserHashed {
+                nickname: self.nickname.clone(),
+                password: None,
+                email: self.email.clone(),
+            })
+        }
+    }
+}
+
+#[patch("/users/me", format = "json", data = "<update_user>")]
+pub fn patch_me(
+    user: AuthenticatedUser,
+    update_user: Json<UpdateUser>,
+    pool: &rocket::State<DbPool>,
+) -> Result<Json<User>, CustomError> {
+    use crate::schema::users;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    validate_password(&update_user.password)?;
+
+    if let Some(nickname) = &update_user.nickname {
+        validate_nickname(nickname)?;
+    }
+
+    let user = users::table
+        .filter(users::handle.eq(&user.handle))
+        .select(users::all_columns)
+        .first::<UserSensitive>(&mut conn)
+        .map_err(|_| {
+            Custom(
+                Status::Unauthorized,
+                Json(ErrorInfo::new("Login failed".to_string())),
+            )
+        })?;
+
+    verify_password(&update_user.password, &user.password).map_err(|_| {
+        Custom(
+            Status::Unauthorized,
+            Json(ErrorInfo::new("Login failed".to_string())),
+        )
+    })?;
+
+    Ok(Json(diesel::update(users::table)
+        .set(update_user.into_inner().hash_password().map_err(|_| {
+            Custom(
+                Status::InternalServerError,
+                Json(ErrorInfo::new("Failed to hash password".to_string())),
+            )
+        })?)
+        .get_result::<UserSensitive>(&mut conn)
+        .map_err(handle_error)?
+        .into()))
+}
+
+#[delete("/users/me")]
+pub fn delete_me(
+    user: AuthenticatedUser,
+    pool: &rocket::State<DbPool>,
+) -> Result<Value, CustomError> {
+    use crate::schema::users;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    diesel::delete(users::table)
+        .filter(users::id.eq(user.id))
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    Ok(json!({ "success": true }))
 }
