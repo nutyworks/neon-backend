@@ -407,7 +407,9 @@ pub fn patch_me(
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    validate_password(&update_user.password)?;
+    if let Some(new_password) = &update_user.new_password {
+        validate_password(new_password)?;
+    }
 
     if let Some(nickname) = &update_user.nickname {
         validate_nickname(nickname)?;
