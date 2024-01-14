@@ -1,4 +1,5 @@
 pub(crate) mod artists;
+pub(crate) mod auth;
 pub(crate) mod bundles;
 pub(crate) mod categories;
 pub(crate) mod characters;

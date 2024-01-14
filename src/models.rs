@@ -1,6 +1,14 @@
+use std::time::SystemTime;
+
 use diesel::prelude::Queryable;
-use rocket::serde::Serialize;
+use rocket::{
+    http::Status,
+    response::status::Custom,
+    serde::{json::Json, Serialize},
+};
 use serde::Deserialize;
+
+use crate::error_handler::{CustomError, ErrorInfo};
 
 #[allow(non_camel_case_types)]
 #[derive(diesel_derive_enum::DbEnum, Debug, Deserialize, Serialize)]
@@ -13,7 +21,6 @@ pub enum BundleTypeEnum {
 #[allow(non_camel_case_types)]
 #[derive(diesel_derive_enum::DbEnum, Debug, Deserialize, Serialize)]
 #[ExistingTypePath = "crate::schema::sql_types::LinkType"]
-
 pub enum LinkTypeEnum {
     info,
     other,
@@ -21,6 +28,15 @@ pub enum LinkTypeEnum {
     notice,
     prepayment,
     demand,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(diesel_derive_enum::DbEnum, Debug, Deserialize, PartialEq, Serialize)]
+#[ExistingTypePath = "crate::schema::sql_types::RoleType"]
+pub enum RoleTypeEnum {
+    admin,
+    moderator,
+    user,
 }
 
 #[derive(Queryable, Serialize)]
@@ -101,4 +117,97 @@ pub struct Link {
     pub type_: LinkTypeEnum,
     pub url: String,
     pub name: Option<String>,
+}
+
+#[derive(Queryable)]
+pub struct UserSensitive {
+    pub id: i32,
+    pub handle: String,
+    pub nickname: String,
+    pub password: String,
+    pub twitter_id: Option<String>,
+    pub role: RoleTypeEnum,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct User {
+    pub handle: String,
+    pub nickname: String,
+    pub twitter_id: Option<String>,
+    pub role: RoleTypeEnum,
+}
+
+#[derive(Queryable, Debug)]
+pub struct AuthenticatedUser {
+    pub id: i32,
+    pub handle: String,
+    pub nickname: String,
+    pub twitter_id: Option<String>,
+    pub role: RoleTypeEnum,
+    pub circles: Vec<i32>,
+}
+
+impl AuthenticatedUser {
+    pub fn check_permission(&self, circle_id: i32) -> Result<(), CustomError> {
+        match self.role {
+            RoleTypeEnum::admin | RoleTypeEnum::moderator => Ok(()),
+            RoleTypeEnum::user => {
+                if self.circles.contains(&circle_id) {
+                    Ok(())
+                } else {
+                    Err(Custom(
+                        Status::Unauthorized,
+                        Json(ErrorInfo::new("You are not allowed to do this!".into())),
+                    ))
+                }
+            }
+        }
+    }
+
+    pub fn check_moderator(&self) -> Result<(), CustomError> {
+        match self.role {
+            RoleTypeEnum::admin | RoleTypeEnum::moderator => Ok(()),
+            RoleTypeEnum::user => Err(Custom(
+                Status::Unauthorized,
+                Json(ErrorInfo::new("You are not allowed to do this!".into())),
+            )),
+        }
+    }
+
+    pub fn check_artist(&self) -> Result<(), CustomError> {
+        match self.role {
+            RoleTypeEnum::admin | RoleTypeEnum::moderator => Ok(()),
+            RoleTypeEnum::user => {
+                if self.circles.is_empty() {
+                    Err(Custom(
+                        Status::Unauthorized,
+                        Json(ErrorInfo::new("You are not allowed to do this!".into())),
+                    ))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+impl Into<User> for UserSensitive {
+    fn into(self) -> User {
+        User {
+            handle: self.handle,
+            nickname: self.nickname,
+            twitter_id: self.twitter_id,
+            role: self.role,
+        }
+    }
+}
+
+#[derive(Queryable)]
+pub struct Token {
+    pub id: i32,
+    pub selector: String,
+    pub hashed_validator: String,
+    pub user_id: i32,
+    pub expires: Option<SystemTime>,
 }

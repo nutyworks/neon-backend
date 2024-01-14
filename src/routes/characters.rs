@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::Character;
+use crate::models::{AuthenticatedUser, Character};
 use crate::DbPool;
 use diesel::prelude::*;
 use rocket::http::Status;
@@ -24,10 +24,13 @@ pub struct UpdateCharacter {
 
 #[post("/characters", format = "json", data = "<new_character>")]
 pub fn post_character(
+    user: AuthenticatedUser,
     new_character: Json<NewCharacter>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Character>>, CustomError> {
     use crate::schema::characters;
+
+    user.check_artist()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -97,11 +100,14 @@ pub fn get_character_by_id(
     data = "<update_character>"
 )]
 pub fn patch_character(
+    user: AuthenticatedUser,
     character_id: i32,
     update_character: Json<UpdateCharacter>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Character>, CustomError> {
     use crate::schema::characters::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -119,10 +125,13 @@ pub fn patch_character(
 
 #[delete("/characters/<character_id>")]
 pub fn delete_character(
+    user: AuthenticatedUser,
     character_id: i32,
     pool: &rocket::State<DbPool>,
 ) -> Result<(), CustomError> {
     use crate::schema::characters::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 

@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::Ref;
+use crate::models::{AuthenticatedUser, Ref};
 use crate::DbPool;
 use diesel::prelude::*;
 use rocket::http::Status;
@@ -22,10 +22,13 @@ pub struct UpdateRef {
 
 #[post("/references", format = "json", data = "<new_reference>")]
 pub fn post_reference(
+    user: AuthenticatedUser,
     new_reference: Json<NewRef>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Ref>>, CustomError> {
     use crate::schema::refs;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -70,11 +73,14 @@ pub fn get_reference_by_id(
 
 #[patch("/references/<ref_id>", format = "json", data = "<update_reference>")]
 pub fn patch_reference(
+    user: AuthenticatedUser,
     ref_id: i32,
     update_reference: Json<UpdateRef>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Ref>, CustomError> {
     use crate::schema::refs::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -90,8 +96,14 @@ pub fn patch_reference(
 }
 
 #[delete("/references/<ref_id>")]
-pub fn delete_reference(ref_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_reference(
+    user: AuthenticatedUser,
+    ref_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::refs::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 

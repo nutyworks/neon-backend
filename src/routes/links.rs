@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{Link, LinkTypeEnum};
+use crate::models::{AuthenticatedUser, Link, LinkTypeEnum};
 use crate::DbPool;
 
 use diesel::prelude::*;
@@ -35,12 +35,15 @@ pub struct UpdateLink {
 
 #[post("/circles/<circle_id>/links", format = "json", data = "<new_link>")]
 pub fn post_circle_link(
+    user: AuthenticatedUser,
     circle_id: i32,
     new_link: Json<NewLink>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Link>>, CustomError> {
     use crate::schema::circle_links;
     use crate::schema::links;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -104,13 +107,23 @@ pub fn get_link_by_id(
 
 #[patch("/links/<link_id>", format = "json", data = "<link_request>")]
 pub fn patch_link(
+    user: AuthenticatedUser,
     link_id: i32,
     link_request: Json<UpdateLink>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Link>, CustomError> {
+    use crate::schema::circle_links;
     use crate::schema::links::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_links::table
+        .filter(circle_links::link_id.eq(link_id))
+        .select(circle_links::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::update(links.find(link_id))
         .set(link_request.into_inner())
@@ -125,11 +138,23 @@ pub fn patch_link(
 }
 
 #[delete("/links/<link_id>")]
-pub fn delete_link(link_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_link(
+    user: AuthenticatedUser,
+    link_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::circle_links;
     use crate::schema::links::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_links::table
+        .filter(circle_links::link_id.eq(link_id))
+        .select(circle_links::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::delete(circle_links::dsl::circle_links.filter(circle_links::dsl::link_id.eq(link_id)))
         .execute(&mut conn)

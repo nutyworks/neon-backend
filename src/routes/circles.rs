@@ -1,4 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
+use crate::models::AuthenticatedUser;
 use crate::{models::Circle, DbPool};
 
 use diesel::prelude::*;
@@ -79,10 +80,13 @@ pub struct UpdateCircle {
 
 #[post("/circles", format = "json", data = "<new_circle>")]
 pub fn post_circle(
+    user: AuthenticatedUser,
     new_circle: Json<NewCircle>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Circle>>, CustomError> {
     use crate::schema::circles;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -96,11 +100,14 @@ pub fn post_circle(
 
 #[patch("/circles/<circle_id>", format = "json", data = "<update_circle>")]
 pub fn patch_circle(
+    user: AuthenticatedUser,
     circle_id: i32,
     update_circle: Json<UpdateCircle>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Circle>, CustomError> {
     use crate::schema::circles::dsl::*;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -117,12 +124,18 @@ pub fn patch_circle(
 }
 
 #[delete("/circles/<circle_id>")]
-pub fn delete_circle(circle_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_circle(
+    user: AuthenticatedUser,
+    circle_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::circle_artists;
     use crate::schema::circle_bundles;
     use crate::schema::circle_goods;
     use crate::schema::circle_links;
     use crate::schema::circles::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 

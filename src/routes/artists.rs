@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::Artist;
+use crate::models::{Artist, AuthenticatedUser};
 use crate::DbPool;
 use diesel::prelude::*;
 use rocket::http::Status;
@@ -41,11 +41,14 @@ pub struct NewCircleArtist {
     data = "<new_artist_id>"
 )]
 pub fn post_circle_artist(
+    user: AuthenticatedUser,
     circle_id: i32,
     new_artist_id: Json<NewArtistId>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<()>, CustomError> {
     use crate::schema::circle_artists;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -65,11 +68,14 @@ pub fn post_circle_artist(
 
 #[delete("/circles/<circle_id>/artists/<artist_id>")]
 pub fn delete_circle_artist(
+    user: AuthenticatedUser,
     circle_id: i32,
     artist_id: i32,
     pool: &rocket::State<DbPool>,
 ) -> Result<(), CustomError> {
     use crate::schema::circle_artists;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -86,10 +92,13 @@ pub fn delete_circle_artist(
 
 #[post("/artists", format = "json", data = "<new_artist>")]
 pub fn post_artist(
+    user: AuthenticatedUser,
     new_artist: Json<NewArtist>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Artist>>, CustomError> {
     use crate::schema::artists;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -149,11 +158,14 @@ pub fn get_artist_by_id(
 
 #[patch("/artists/<artist_id>", format = "json", data = "<update_artist>")]
 pub fn patch_artist(
+    user: AuthenticatedUser,
     artist_id: i32,
     update_artist: Json<UpdateArtist>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Artist>, CustomError> {
     use crate::schema::artists::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -170,8 +182,14 @@ pub fn patch_artist(
 }
 
 #[delete("/artists/<artist_id>")]
-pub fn delete_artist(artist_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_artist(
+    user: AuthenticatedUser,
+    artist_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::artists::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 

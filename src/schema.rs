@@ -8,6 +8,10 @@ pub mod sql_types {
     #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "link_type"))]
     pub struct LinkType;
+
+    #[derive(diesel::query_builder::QueryId, diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "role_type"))]
+    pub struct RoleType;
 }
 
 diesel::table! {
@@ -147,6 +151,44 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    tokens (id) {
+        id -> Int4,
+        #[max_length = 12]
+        selector -> Bpchar,
+        #[max_length = 64]
+        hashed_validator -> Bpchar,
+        user_id -> Int4,
+        expires -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
+    user_circles (id) {
+        id -> Int4,
+        user_id -> Int4,
+        circle_id -> Int4,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
+    use super::sql_types::RoleType;
+
+    users (id) {
+        id -> Int4,
+        #[max_length = 20]
+        handle -> Varchar,
+        #[max_length = 100]
+        nickname -> Varchar,
+        #[max_length = 97]
+        password -> Bpchar,
+        #[max_length = 16]
+        twitter_id -> Nullable<Varchar>,
+        role -> RoleType,
+    }
+}
+
 diesel::joinable!(characters -> refs (reference_id));
 diesel::joinable!(circle_artists -> artists (artist_id));
 diesel::joinable!(circle_artists -> circles (circle_id));
@@ -161,6 +203,9 @@ diesel::joinable!(goods_character -> characters (character_id));
 diesel::joinable!(goods_character -> goods (goods_id));
 diesel::joinable!(goods_in_bundle -> bundles (bundle_id));
 diesel::joinable!(goods_in_bundle -> goods (goods_id));
+diesel::joinable!(tokens -> users (user_id));
+diesel::joinable!(user_circles -> circles (circle_id));
+diesel::joinable!(user_circles -> users (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     artists,
@@ -177,4 +222,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     goods_in_bundle,
     links,
     refs,
+    tokens,
+    user_circles,
+    users,
 );

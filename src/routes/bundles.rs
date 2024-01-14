@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{Bundle, BundleGoods, BundleTypeEnum};
+use crate::models::{AuthenticatedUser, Bundle, BundleGoods, BundleTypeEnum};
 use crate::DbPool;
 
 use diesel::prelude::*;
@@ -40,12 +40,15 @@ pub struct NewCircleBundle {
 
 #[post("/circles/<circle_id>/bundles", format = "json", data = "<new_bundle>")]
 pub fn post_circle_bundle(
+    user: AuthenticatedUser,
     circle_id: i32,
     new_bundle: Json<NewBundle>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Bundle>>, CustomError> {
     use crate::schema::bundles;
     use crate::schema::circle_bundles;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -111,13 +114,23 @@ pub fn get_bundle_by_id(
 
 #[patch("/bundles/<bundle_id>", format = "json", data = "<update_bundle>")]
 pub fn patch_bundle(
+    user: AuthenticatedUser,
     bundle_id: i32,
     update_bundle: Json<UpdateBundle>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Bundle>, CustomError> {
     use crate::schema::bundles::dsl::*;
+    use crate::schema::circle_bundles;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_bundles::table
+        .filter(circle_bundles::bundle_id.eq(bundle_id))
+        .select(circle_bundles::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::update(bundles.find(bundle_id))
         .set(update_bundle.into_inner())
@@ -132,11 +145,23 @@ pub fn patch_bundle(
 }
 
 #[delete("/bundles/<bundle_id>")]
-pub fn delete_bundle(bundle_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_bundle(
+    user: AuthenticatedUser,
+    bundle_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::bundles::dsl::*;
     use crate::schema::circle_bundles;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_bundles::table
+        .filter(circle_bundles::bundle_id.eq(bundle_id))
+        .select(circle_bundles::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::delete(
         circle_bundles::dsl::circle_bundles.filter(circle_bundles::dsl::bundle_id.eq(bundle_id)),
@@ -181,13 +206,23 @@ pub struct UpdateBundleGoods {
 
 #[post("/bundles/<bundle_id>/goods", format = "json", data = "<new_goods>")]
 pub fn post_bundle_goods(
+    user: AuthenticatedUser,
     bundle_id: i32,
     new_goods: Json<NewGoodId>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<()>, CustomError> {
+    use crate::schema::circle_bundles;
     use crate::schema::goods_in_bundle;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_bundles::table
+        .filter(circle_bundles::bundle_id.eq(bundle_id))
+        .select(circle_bundles::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::insert_into(goods_in_bundle::dsl::goods_in_bundle)
         .values(NewBundleGoods {
@@ -210,14 +245,24 @@ pub fn post_bundle_goods(
     data = "<update_bundle_goods>"
 )]
 pub fn patch_bundle_goods(
+    user: AuthenticatedUser,
     bundle_id: i32,
     goods_id: i32,
     update_bundle_goods: Json<UpdateBundleGoods>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<BundleGoods>, CustomError> {
+    use crate::schema::circle_bundles;
     use crate::schema::goods_in_bundle;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_bundles::table
+        .filter(circle_bundles::bundle_id.eq(bundle_id))
+        .select(circle_bundles::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::update(
         goods_in_bundle::dsl::goods_in_bundle
@@ -239,13 +284,23 @@ pub fn patch_bundle_goods(
 
 #[delete("/bundles/<bundle_id>/goods/<goods_id>")]
 pub fn delete_bundle_goods(
+    user: AuthenticatedUser,
     bundle_id: i32,
     goods_id: i32,
     pool: &rocket::State<DbPool>,
 ) -> Result<(), CustomError> {
+    use crate::schema::circle_bundles;
     use crate::schema::goods_in_bundle;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_bundles::table
+        .filter(circle_bundles::bundle_id.eq(bundle_id))
+        .select(circle_bundles::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     let size = diesel::delete(
         goods_in_bundle::dsl::goods_in_bundle

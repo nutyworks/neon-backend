@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::Good;
+use crate::models::{AuthenticatedUser, Good};
 use crate::DbPool;
 
 use diesel::prelude::*;
@@ -35,12 +35,15 @@ pub struct NewCircleGoods {
 
 #[post("/circles/<circle_id>/goods", format = "json", data = "<new_goods>")]
 pub fn post_circle_goods(
+    user: AuthenticatedUser,
     circle_id: i32,
     new_goods: Json<NewGood>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Good>>, CustomError> {
     use crate::schema::circle_goods;
     use crate::schema::goods;
+
+    user.check_permission(circle_id)?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -144,13 +147,23 @@ pub fn get_goods_by_id(
 
 #[patch("/goods/<goods_id>", format = "json", data = "<update_goods>")]
 pub fn patch_goods(
+    user: AuthenticatedUser,
     goods_id: i32,
     update_goods: Json<UpdateGood>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Good>, CustomError> {
+    use crate::schema::circle_goods;
     use crate::schema::goods::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_goods::table
+        .filter(circle_goods::goods_id.eq(goods_id))
+        .select(circle_goods::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::update(goods.find(goods_id))
         .set(update_goods.into_inner())
@@ -165,11 +178,23 @@ pub fn patch_goods(
 }
 
 #[delete("/goods/<goods_id>")]
-pub fn delete_goods(goods_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_goods(
+    user: AuthenticatedUser,
+    goods_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::circle_goods;
     use crate::schema::goods::dsl::*;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_goods::table
+        .filter(circle_goods::goods_id.eq(goods_id))
+        .select(circle_goods::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::delete(
         circle_goods::dsl::circle_goods.filter(circle_goods::dsl::goods_id.eq(goods_id)),
@@ -210,13 +235,23 @@ pub struct NewGoodsCharacter {
     data = "<new_character_id>"
 )]
 pub fn post_good_character(
+    user: AuthenticatedUser,
     goods_id: i32,
     new_character_id: Json<NewCharacterId>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<()>, CustomError> {
+    use crate::schema::circle_goods;
     use crate::schema::goods_character;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_goods::table
+        .filter(circle_goods::goods_id.eq(goods_id))
+        .select(circle_goods::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     diesel::insert_into(goods_character::dsl::goods_character)
         .values(NewGoodsCharacter {
@@ -234,13 +269,23 @@ pub fn post_good_character(
 
 #[delete("/goods/<goods_id>/characters/<character_id>")]
 pub fn delete_good_character(
+    user: AuthenticatedUser,
     goods_id: i32,
     character_id: i32,
     pool: &rocket::State<DbPool>,
 ) -> Result<(), CustomError> {
+    use crate::schema::circle_goods;
     use crate::schema::goods_character;
 
     let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circle_id = circle_goods::table
+        .filter(circle_goods::goods_id.eq(goods_id))
+        .select(circle_goods::circle_id)
+        .first::<i32>(&mut conn)
+        .map_err(handle_error)?;
+
+    user.check_permission(circle_id)?;
 
     let size = diesel::delete(
         goods_character::dsl::goods_character

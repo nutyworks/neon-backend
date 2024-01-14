@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::Category;
+use crate::models::{AuthenticatedUser, Category};
 use crate::DbPool;
 use diesel::prelude::*;
 use rocket::http::Status;
@@ -22,10 +22,13 @@ pub struct UpdateCategory {
 
 #[post("/categories", format = "json", data = "<new_category>")]
 pub fn post_category(
+    user: AuthenticatedUser,
     new_category: Json<NewCategory>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Created<Json<Category>>, CustomError> {
     use crate::schema::categories;
+
+    user.check_artist()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -76,11 +79,14 @@ pub fn get_category_by_id(
     data = "<update_category>"
 )]
 pub fn patch_category(
+    user: AuthenticatedUser,
     category_id: i32,
     update_category: Json<UpdateCategory>,
     pool: &rocket::State<DbPool>,
 ) -> Result<Json<Category>, CustomError> {
     use crate::schema::categories::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -97,8 +103,14 @@ pub fn patch_category(
 }
 
 #[delete("/categories/<category_id>")]
-pub fn delete_category(category_id: i32, pool: &rocket::State<DbPool>) -> Result<(), CustomError> {
+pub fn delete_category(
+    user: AuthenticatedUser,
+    category_id: i32,
+    pool: &rocket::State<DbPool>,
+) -> Result<(), CustomError> {
     use crate::schema::categories::dsl::*;
+
+    user.check_moderator()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
