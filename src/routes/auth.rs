@@ -104,8 +104,8 @@ fn validate_handle(handle: &str) -> Result<(), CustomError> {
 }
 
 fn validate_password(password: &str) -> Result<(), CustomError> {
-    if password.len() >= 8 {
-        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Password should be equal to or longer than 8".into()))))
+    if password.is_empty() {
+        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Password too short".into()))))
     } else {
         Ok(())
     }
