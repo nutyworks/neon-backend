@@ -98,7 +98,7 @@ pub fn post_artist(
 ) -> Result<Created<Json<Artist>>, CustomError> {
     use crate::schema::artists;
 
-    user.check_moderator()?;
+    user.check_artist()?;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
