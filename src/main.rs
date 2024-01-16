@@ -16,7 +16,7 @@ use routes::artists::{
     delete_artist, delete_circle_artist, get_artist_by_id, get_artists, patch_artist, post_artist,
     post_circle_artist,
 };
-use routes::auth::{add_user, check_handle, delete_me, get_me, login, patch_me};
+use routes::auth::{add_user, check_handle, delete_me, get_me, login, logout, patch_me};
 use routes::bundles::{
     delete_bundle, delete_bundle_goods, get_bundle_by_id, get_bundles, patch_bundle,
     patch_bundle_goods, post_bundle_goods, post_circle_bundle,
@@ -88,6 +88,7 @@ fn rocket() -> _ {
             routes![
                 add_user,
                 login,
+                logout,
                 check_handle,
                 patch_me,
                 delete_me,

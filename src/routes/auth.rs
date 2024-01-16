@@ -242,6 +242,31 @@ pub fn login(
     Ok(json!({ "success": true }))
 }
 
+#[post("/user/logout")]
+pub fn logout(
+    user: AuthenticatedUser,
+    pool: &rocket::State<DbPool>,
+    jar: &CookieJar,
+) -> Result<Value, CustomError> {
+    use crate::schema::tokens;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    diesel::delete(tokens::table)
+        .filter(tokens::user_id.eq(user.id))
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    jar.remove(
+        Cookie::build("token")
+            .domain("neon.nuty.works")
+            .secure(true)
+            .http_only(true)
+            .same_site(SameSite::Strict));
+
+    Ok(json!({ "success": true }))
+}
+
 #[derive(Debug)]
 pub enum AuthorizationError {
     DatabaseConnection,
@@ -407,8 +432,10 @@ pub fn patch_me(
     user: AuthenticatedUser,
     update_user: Json<UpdateUser>,
     pool: &rocket::State<DbPool>,
+    jar: &CookieJar,
 ) -> Result<Json<User>, CustomError> {
     use crate::schema::users;
+    use crate::schema::tokens;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -437,6 +464,20 @@ pub fn patch_me(
             Json(ErrorInfo::new("Login failed".to_string())),
         )
     })?;
+
+    if let Some(_) = update_user.new_password {
+        diesel::delete(tokens::table)
+            .filter(tokens::user_id.eq(user.id))
+            .execute(&mut conn)
+            .map_err(handle_error)?;
+
+        jar.remove(
+            Cookie::build("token")
+                .domain("neon.nuty.works")
+                .secure(true)
+                .http_only(true)
+                .same_site(SameSite::Strict));
+    }
 
     Ok(Json(
         diesel::update(users::table)
