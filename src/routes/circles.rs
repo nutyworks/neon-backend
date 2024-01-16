@@ -27,11 +27,11 @@ pub fn get_circles(
         .into_boxed();
 
     if let Some(name) = name {
-        query = query.filter(circles::name.like(format!("%{}%", name)));
+        query = query.filter(circles::name.similar_to(format!("%{}%", name)));
     }
 
     if let Some(artist_name) = artist_name {
-        query = query.filter(artists::name.like(format!("%{}%", artist_name)));
+        query = query.filter(artists::name.similar_to(format!("%{}%", artist_name)));
     }
 
     if let Some(location) = location {

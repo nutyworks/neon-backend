@@ -97,7 +97,7 @@ pub fn get_goods(
 
     // Apply filters based on query parameters
     if let Some(name_filter) = name {
-        query = query.filter(goods::name.like(format!("%{}%", name_filter)));
+        query = query.filter(goods::name.similar_to(format!("%{}%", name_filter)));
     }
 
     if let Some(character_id_filter) = character_id {

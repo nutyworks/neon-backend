@@ -50,7 +50,7 @@ pub fn get_references(
     let mut conn = pool.get().expect("Failed to get database connection");
 
     refs::table
-        .filter(refs::name.like(format!("%{}%", name.unwrap_or("".into()))))
+        .filter(refs::name.similar_to(format!("%{}%", name.unwrap_or("".into()))))
         .load::<Ref>(&mut conn)
         .map(Json)
         .map_err(handle_error)

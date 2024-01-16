@@ -59,7 +59,7 @@ pub fn get_characters(
         .into_boxed();
 
     if let Some(name) = name {
-        query = query.filter(characters::name.like(format!("%{}%", name)));
+        query = query.filter(characters::name.similar_to(format!("%{}%", name)));
     }
 
     if let Some(ref_id) = ref_id {
