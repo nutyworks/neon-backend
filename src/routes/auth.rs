@@ -355,6 +355,7 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
             handle: user.handle,
             nickname: user.nickname,
             twitter_id: user.twitter_id,
+            email: user.email,
             role: user.role,
             circles: user_circles,
         })

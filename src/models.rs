@@ -145,6 +145,7 @@ pub struct AuthenticatedUser {
     pub handle: String,
     pub nickname: String,
     pub twitter_id: Option<String>,
+    pub email: String,
     pub role: RoleTypeEnum,
     pub circles: Vec<i32>,
 }
