@@ -1,12 +1,9 @@
-use std::{
-    env,
-    time::{Duration, SystemTime},
-};
+use std::time::{Duration, SystemTime};
 
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use diesel::{
     prelude::*,
-    r2d2::{ConnectionManager, ManageConnection, PooledConnection},
+    r2d2::{ConnectionManager, PooledConnection},
 };
 use dotenvy::dotenv;
 use rand_core::{OsRng, RngCore};
@@ -97,7 +94,10 @@ fn generate_random_string(len: usize) -> String {
 
 fn validate_handle(handle: &str) -> Result<(), CustomError> {
     if handle.is_empty() {
-        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Handle too short".into()))))
+        Err(Custom(
+            Status::BadRequest,
+            Json(ErrorInfo::new("Handle too short".into())),
+        ))
     } else {
         Ok(())
     }
@@ -105,7 +105,10 @@ fn validate_handle(handle: &str) -> Result<(), CustomError> {
 
 fn validate_password(password: &str) -> Result<(), CustomError> {
     if password.is_empty() {
-        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Password too short".into()))))
+        Err(Custom(
+            Status::BadRequest,
+            Json(ErrorInfo::new("Password too short".into())),
+        ))
     } else {
         Ok(())
     }
@@ -113,12 +116,14 @@ fn validate_password(password: &str) -> Result<(), CustomError> {
 
 fn validate_nickname(nickname: &str) -> Result<(), CustomError> {
     if nickname.is_empty() {
-        Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Nickname too short".into()))))
+        Err(Custom(
+            Status::BadRequest,
+            Json(ErrorInfo::new("Nickname too short".into())),
+        ))
     } else {
         Ok(())
     }
 }
-
 
 #[get("/user/check_handle?<handle>")]
 pub fn check_handle(handle: String, pool: &rocket::State<DbPool>) -> Result<Value, CustomError> {
@@ -258,10 +263,12 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
         let pool = request.guard::<&rocket::State<DbPool>>().await;
         let mut conn = match pool.succeeded() {
             Some(pool) => pool.get().expect("Failed to get database connection"),
-            None => return rocket::request::Outcome::Error((
+            None => {
+                return rocket::request::Outcome::Error((
                     Status::InternalServerError,
                     AuthorizationError::DatabaseConnection,
-            )),
+                ))
+            }
         };
 
         let token = match request.cookies().get("token") {
@@ -430,16 +437,18 @@ pub fn patch_me(
         )
     })?;
 
-    Ok(Json(diesel::update(users::table)
-        .set(update_user.into_inner().hash_password().map_err(|_| {
-            Custom(
-                Status::InternalServerError,
-                Json(ErrorInfo::new("Failed to hash password".to_string())),
-            )
-        })?)
-        .get_result::<UserSensitive>(&mut conn)
-        .map_err(handle_error)?
-        .into()))
+    Ok(Json(
+        diesel::update(users::table)
+            .set(update_user.into_inner().hash_password().map_err(|_| {
+                Custom(
+                    Status::InternalServerError,
+                    Json(ErrorInfo::new("Failed to hash password".to_string())),
+                )
+            })?)
+            .get_result::<UserSensitive>(&mut conn)
+            .map_err(handle_error)?
+            .into(),
+    ))
 }
 
 #[delete("/users/me")]
@@ -460,8 +469,6 @@ pub fn delete_me(
 }
 
 #[get("/users/me")]
-pub fn get_me(
-    user: AuthenticatedUser,
-) -> Result<Json<AuthenticatedUser>, CustomError> {
+pub fn get_me(user: AuthenticatedUser) -> Result<Json<AuthenticatedUser>, CustomError> {
     Ok(Json(user))
 }
