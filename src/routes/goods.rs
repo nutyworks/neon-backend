@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{AuthenticatedUser, Good, CharacterWithReference, FullGood};
+use crate::models::{AuthenticatedUser, Good, CharacterWithReference, FullGood, Category};
 use crate::DbPool;
 
 use diesel::dsl::sql;
@@ -135,10 +135,9 @@ pub fn get_goods(
         use crate::schema::characters;
         use crate::schema::refs;
 
-        let category_name = categories::table
+        let category = categories::table
             .filter(categories::id.eq(good.category_id))
-            .select(categories::name)
-            .first::<String>(&mut conn)
+            .first::<Category>(&mut conn)
             .unwrap();
 
         let characters = goods_character::table
@@ -154,7 +153,7 @@ pub fn get_goods(
             name: good.name.clone(), 
             description: good.description.clone(), 
             price: good.price, 
-            category_name, 
+            category, 
             characters
         }
     }).collect::<Vec<_>>()))

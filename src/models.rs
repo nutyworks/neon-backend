@@ -65,7 +65,7 @@ pub struct FullGood {
     pub name: Option<String>,
     pub description: Option<String>,
     pub price: Option<i32>,
-    pub category_name: String,
+    pub category: Category,
     pub characters: Vec<CharacterWithReference>,
 }
 
