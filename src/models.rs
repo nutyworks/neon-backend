@@ -58,6 +58,25 @@ pub struct Good {
     pub category_id: i32,
 }
 
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct FullGood {
+    pub id: i32,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub price: Option<i32>,
+    pub category_name: String,
+    pub characters: Vec<CharacterWithReference>,
+}
+
+#[derive(Queryable, Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct CharacterWithReference {
+    pub id: i32,
+    pub character: String,
+    pub reference: String,
+}
+
 #[derive(Queryable, Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Bundle {

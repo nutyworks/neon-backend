@@ -1,8 +1,10 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{AuthenticatedUser, Good};
+use crate::models::{AuthenticatedUser, Good, CharacterWithReference, FullGood};
 use crate::DbPool;
 
+use diesel::dsl::sql;
 use diesel::prelude::*;
+use diesel::sql_types::{Text, Integer};
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
@@ -78,7 +80,7 @@ pub fn get_goods(
     bundle_id: Option<i32>,
     circle_id: Option<i32>,
     pool: &rocket::State<DbPool>,
-) -> Result<Json<Vec<Good>>, CustomError> {
+) -> Result<Json<Vec<FullGood>>, CustomError> {
     use crate::schema::characters;
     use crate::schema::circle_goods;
     use crate::schema::goods;
@@ -121,12 +123,41 @@ pub fn get_goods(
     }
 
     // Execute the final query and return the result
-    query
+    let goods = query
         .select(goods::all_columns)
         .distinct()
         .load::<Good>(&mut conn)
-        .map(Json)
-        .map_err(handle_error)
+        .map_err(handle_error)?;
+
+    Ok(Json(goods.iter().map(|good: &Good| {
+        use crate::schema::categories;
+        use crate::schema::goods_character;
+        use crate::schema::characters;
+        use crate::schema::refs;
+
+        let category_name = categories::table
+            .filter(categories::id.eq(good.category_id))
+            .select(categories::name)
+            .first::<String>(&mut conn)
+            .unwrap();
+
+        let characters = goods_character::table
+            .left_join(characters::table.on(goods_character::character_id.eq(characters::id)))
+            .left_join(refs::table.on(characters::reference_id.eq(refs::id)))
+            .filter(goods_character::goods_id.eq(good.id))
+            .select((sql::<Integer>("characters.id"), sql::<Text>("characters.name"), sql::<Text>("refs.name")))
+            .load::<CharacterWithReference>(&mut conn)
+            .unwrap();
+
+        FullGood { 
+            id: good.id,
+            name: good.name.clone(), 
+            description: good.description.clone(), 
+            price: good.price, 
+            category_name, 
+            characters
+        }
+    }).collect::<Vec<_>>()))
 }
 
 #[get("/goods/<goods_id>")]
