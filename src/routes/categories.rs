@@ -50,7 +50,7 @@ pub fn get_categories(
     let mut conn = pool.get().expect("Failed to get database connection");
 
     categories::table
-        .filter(categories::name.like(format!("%{}%", name.unwrap_or("".into()))))
+        .filter(categories::name.similar_to(format!("%{}%", name.unwrap_or("".into()))))
         .load::<Category>(&mut conn)
         .map(Json)
         .map_err(handle_error)
