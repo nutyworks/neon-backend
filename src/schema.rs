@@ -188,6 +188,10 @@ diesel::table! {
         role -> RoleType,
         #[max_length = 255]
         email -> Varchar,
+        #[max_length = 128]
+        code_verifier -> Nullable<Bpchar>,
+        #[max_length = 16]
+        oauth_state -> Nullable<Bpchar>,
     }
 }
 

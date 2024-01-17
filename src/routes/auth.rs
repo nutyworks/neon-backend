@@ -1,19 +1,24 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    env,
+    time::{Duration, SystemTime},
+};
 
 use argon2::{password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use diesel::{
     prelude::*,
     r2d2::{ConnectionManager, PooledConnection},
 };
 use dotenvy::dotenv;
 use rand_core::{OsRng, RngCore};
-use rocket::serde::json::Json;
+use reqwest;
 use rocket::{
     http::{Cookie, CookieJar, SameSite, Status},
     request::FromRequest,
     response::status::{Created, Custom},
     Request,
 };
+use rocket::{response::Redirect, serde::json::Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -191,6 +196,8 @@ pub fn login(
     use crate::schema::tokens;
     use crate::schema::users;
 
+    dotenv().ok();
+
     let mut conn = pool.get().expect("Failed to get database connection");
 
     let user = users::table
@@ -233,8 +240,8 @@ pub fn login(
 
     jar.add(
         Cookie::build(("token", format!("{}:{}", selector, validator)))
-            .domain("neon.nuty.works")
-            .secure(true)
+            .domain(env::var("DOMAIN").expect("DOMAIN not set"))
+            .secure(env::var("SECURE").expect("SECURE not set") == "true")
             .http_only(true)
             .same_site(SameSite::Strict),
     );
@@ -262,7 +269,8 @@ pub fn logout(
             .domain("neon.nuty.works")
             .secure(true)
             .http_only(true)
-            .same_site(SameSite::Strict));
+            .same_site(SameSite::Strict),
+    );
 
     Ok(json!({ "success": true }))
 }
@@ -434,8 +442,10 @@ pub fn patch_me(
     pool: &rocket::State<DbPool>,
     jar: &CookieJar,
 ) -> Result<Json<User>, CustomError> {
-    use crate::schema::users;
     use crate::schema::tokens;
+    use crate::schema::users;
+
+    dotenv().ok();
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
@@ -473,10 +483,11 @@ pub fn patch_me(
 
         jar.remove(
             Cookie::build("token")
-                .domain("neon.nuty.works")
-                .secure(true)
+                .domain(env::var("DOMAIN").expect("DOMAIN not set"))
+                .secure(env::var("SECURE").expect("SECURE not set") == "true")
                 .http_only(true)
-                .same_site(SameSite::Strict));
+                .same_site(SameSite::Strict),
+        );
     }
 
     Ok(Json(
@@ -513,4 +524,116 @@ pub fn delete_me(
 #[get("/users/me")]
 pub fn get_me(user: AuthenticatedUser) -> Result<Json<AuthenticatedUser>, CustomError> {
     Ok(Json(user))
+}
+
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::users)]
+struct NewCodeVerifier {
+    pub oauth_state: String,
+    pub code_verifier: String,
+}
+
+#[get("/oauth/twitter/new")]
+pub fn new_twitter_oauth(
+    user: AuthenticatedUser,
+    pool: &rocket::State<DbPool>,
+) -> Result<Redirect, CustomError> {
+    use crate::schema::users;
+
+    dotenv().ok();
+
+    let oauth_state = generate_random_string(16);
+    let code_verifier = generate_random_string(128);
+    let code_challenge =
+        URL_SAFE_NO_PAD.encode(hex::decode(sha256::digest(&code_verifier)).unwrap());
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    let url = format!(
+        "https://twitter.com/i/oauth2/authorize?response_type=code&client_id={}&redirect_uri={}%2Fapi%2Foauth%2Ftwitter&scope=tweet.read%20users.read&state={}&code_challenge={}&code_challenge_method=S256",
+        env::var("CLIENT_ID").expect("CLIENT_ID not set"),
+        env::var("BASE_URL").expect("BASE_URL not set").replace(":", "%3A").replace("/", "%2F"),
+        oauth_state,
+        code_challenge
+    );
+
+    diesel::update(users::table)
+        .filter(users::id.eq(user.id))
+        .set(NewCodeVerifier { oauth_state, code_verifier })
+        .execute(&mut conn)
+        .map_err(handle_error)?;
+
+    Ok(Redirect::temporary(url))
+}
+
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::users)]
+struct NewTwitterId {
+    pub twitter_id: String,
+}
+
+#[get("/oauth/twitter?<code>&<state>")]
+pub async fn check_twitter_oauth(
+    state: String,
+    code: String,
+    pool: &rocket::State<DbPool>,
+) -> Result<Redirect, CustomError> {
+    use crate::schema::users;
+
+    dotenv().ok();
+    let base_url = env::var("BASE_URL").expect("BASE_URL not set");
+    let client_id = env::var("CLIENT_ID").expect("CLIENT_ID not set");
+    let client_secret = env::var("CLIENT_SECRET").expect("CLIENT_SECRET not set");
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    let verifier = users::table
+        .filter(users::oauth_state.eq(&state))
+        .select(users::code_verifier)
+        .first::<Option<String>>(&mut conn)
+        .map_err(handle_error)?;
+
+    if let Some(verifier) = verifier {
+        let client = reqwest::Client::new();
+        let response = client.post("https://api.twitter.com/2/oauth2/token")
+            .basic_auth(client_id, Some(client_secret))
+            .form(&[
+                ("code", code.as_str()),
+                ("grant_type", "authorization_code"),
+                (
+                    "redirect_uri", 
+                    format!("{}/api/oauth/twitter", base_url).as_str(),
+                ),
+                ("code_verifier", verifier.as_str()),
+            ])
+            .send()
+            .await
+            .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("Twitter did not respond".into()))))?
+            .json::<Value>()
+            .await
+            .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal_server_error".into()))))?;
+
+        let access_token = response["access_token"].as_str().unwrap();
+
+        let response = client.get("https://api.twitter.com/2/users/me")
+            .bearer_auth(access_token.to_string().trim_matches('"'))
+            .send()
+            .await
+            .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("Twitter did not respond".into()))))?
+            .json::<Value>()
+            .await
+            .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal_server_error".into()))))?;
+
+        let twitter_id = response["data"]["username"].as_str().unwrap().to_string();
+
+        diesel::update(users::table)
+            .filter(users::oauth_state.eq(&state))
+            .set(NewTwitterId { twitter_id })
+            .execute(&mut conn)
+            .map_err(handle_error)?;
+    } else {
+        return Err(Custom(Status::BadRequest, Json(ErrorInfo::new("Invalid request".into()))));
+    }
+
+    Ok(Redirect::temporary("/profile"))
 }
