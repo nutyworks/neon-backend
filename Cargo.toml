@@ -19,3 +19,6 @@ sha256 = "1.5.0"
 base64 = "0.21.7"
 hex = "0.4.3"
 reqwest = { version = "0.11.23", features = ["blocking", "json", "serde_json"] }
+image = "0.24.8"
+rocket_contrib = "0.4.11"
+rocket-multipart-form-data = "0.10.7"

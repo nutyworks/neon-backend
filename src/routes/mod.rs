@@ -5,5 +5,6 @@ pub(crate) mod categories;
 pub(crate) mod characters;
 pub(crate) mod circles;
 pub(crate) mod goods;
+pub(crate) mod images;
 pub(crate) mod links;
 pub(crate) mod references;
