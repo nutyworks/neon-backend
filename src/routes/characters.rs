@@ -1,7 +1,9 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{AuthenticatedUser, Character};
+use crate::models::{AuthenticatedUser, Character, CharacterWithReference};
 use crate::DbPool;
+use diesel::dsl::sql;
 use diesel::prelude::*;
+use diesel::sql_types::{Integer, Text};
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
@@ -48,7 +50,7 @@ pub fn get_characters(
     ref_id: Option<i32>,
     ref_name: Option<String>,
     pool: &rocket::State<DbPool>,
-) -> Result<Json<Vec<Character>>, CustomError> {
+) -> Result<Json<Vec<CharacterWithReference>>, CustomError> {
     use crate::schema::characters;
     use crate::schema::refs;
 
@@ -71,9 +73,9 @@ pub fn get_characters(
     }
 
     query
-        .select(characters::all_columns)
+        .select((sql::<Integer>("characters.id"), sql::<Text>("characters.name"), sql::<Text>("refs.name")))
         .distinct()
-        .load::<Character>(&mut conn)
+        .load::<CharacterWithReference>(&mut conn)
         .map(Json)
         .map_err(handle_error)
 }
