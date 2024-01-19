@@ -1,3 +1,4 @@
+use rocket::fs::NamedFile;
 use rocket::response::status::{Created, Custom};
 
 use rocket::http::{ContentType, Status};
@@ -31,7 +32,7 @@ pub async fn upload_image(
 
     let multipart_form_data = MultipartFormData::parse(content_type, data, options)
         .await
-        .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("cannot parse multipart data".into()))))?;
+        .map_err(|_| Custom(Status::UnprocessableEntity, Json(ErrorInfo::new("cannot parse multipart data".into()))))?;
 
     let image_fields = multipart_form_data.raw.get("image");
 
@@ -53,11 +54,31 @@ pub async fn upload_image(
     };
 
     let filename = generate_random_string(16);
+
+    std::fs::create_dir_all(format!("images/{}", &filename[..2]))
+        .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal server error".into()))))?;
     
-    let mut file = File::create(format!("images/{}", filename))
-        .map_err(|_| Custom(Status::BadRequest, Json(ErrorInfo::new("internal server error".into()))))?;
+    let mut file = File::create(format!("images/{}/{}.webp", &filename[..2], filename))
+        .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal server error".into()))))?;
 
     resized_img.write_to(&mut file, image::ImageOutputFormat::WebP).unwrap();
 
-    Ok(Created::new(format!("images/{}", filename)))
+    Ok(Created::new(format!("images/{}.webp", filename)))
+}
+
+#[get("/images/<filename>")]
+pub async fn get_image(filename: String) -> Result<NamedFile, CustomError> {
+    let is_valid_filename = filename.chars().all(|c| 
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".contains(c))
+        && filename.len() == 16;
+
+    if !is_valid_filename {
+        return Err(Custom(Status::BadRequest, Json(ErrorInfo::new("invalid filename".into()))));
+    }
+
+    Ok(
+        NamedFile::open(format!("images/{}/{}.webp", &filename[..2], filename))
+            .await
+            .map_err(|_| Custom(Status::NotFound, Json(ErrorInfo::new("file not found".into()))))?
+    )
 }

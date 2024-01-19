@@ -32,7 +32,7 @@ use routes::goods::{
     delete_good_character, delete_goods, get_goods, get_goods_by_id, patch_goods,
     post_circle_goods, post_good_character,
 };
-use routes::images::upload_image;
+use routes::images::{upload_image, get_image};
 use routes::links::{delete_link, get_link_by_id, get_links, patch_link, post_circle_link};
 use routes::references::{
     delete_reference, get_reference_by_id, get_references, patch_reference, post_reference,
@@ -89,6 +89,7 @@ fn rocket() -> _ {
             "/",
             routes![
                 upload_image,
+                get_image,
                 add_user,
                 login,
                 logout,
