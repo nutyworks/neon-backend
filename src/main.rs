@@ -42,6 +42,7 @@ mod error_handler;
 mod models;
 mod routes;
 mod schema;
+mod utils;
 
 type DbPool = Pool<ConnectionManager<PgConnection>>;
 

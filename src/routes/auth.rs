@@ -10,7 +10,7 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
 };
 use dotenvy::dotenv;
-use rand_core::{OsRng, RngCore};
+use rand_core::OsRng;
 use reqwest;
 use rocket::{
     http::{Cookie, CookieJar, SameSite, Status},
@@ -25,7 +25,7 @@ use serde_json::{json, Value};
 use crate::{
     error_handler::{handle_error, CustomError, ErrorInfo},
     models::{AuthenticatedUser, Token, User, UserSensitive},
-    DbPool,
+    DbPool, utils::strings::generate_random_string,
 };
 
 #[derive(Deserialize, Insertable, Queryable, Selectable)]
@@ -71,30 +71,6 @@ fn is_handle_exists(
         .map_err(handle_error)?;
 
     Ok(rows > 0)
-}
-
-fn generate_random_string(len: usize) -> String {
-    vec![0; len]
-        .iter()
-        .map(|_| {
-            let v = rand_core::OsRng.next_u32() % 62;
-            if v <= 9 {
-                ('0' as u32) + v
-            } else if 10 <= v && v <= 35 {
-                ('A' as u32) + v - 10
-            } else {
-                ('a' as u32) + v - 36
-            }
-        })
-        .map(char::from_u32)
-        .scan(Some(""), |acc, x| match acc {
-            Some(acc) => match x {
-                Some(x) => Some(acc.to_string() + &x.to_string()),
-                None => None,
-            },
-            None => None,
-        })
-        .collect()
 }
 
 fn validate_handle(handle: &str) -> Result<(), CustomError> {

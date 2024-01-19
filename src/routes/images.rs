@@ -1,37 +1,37 @@
-use rocket::response::status::Created;
+use rocket::response::status::{Created, Custom};
 
-use rocket::http::ContentType;
+use rocket::http::{ContentType, Status};
 use rocket::Data;
 
+use rocket::serde::json::Json;
 use rocket_multipart_form_data::{
     mime, MultipartFormData, MultipartFormDataField, MultipartFormDataOptions,
 };
 
 use std::fs::File;
 
-use std::time::{Instant, Duration};
-
+use crate::error_handler::{ErrorInfo, CustomError};
+use crate::models::AuthenticatedUser;
+use crate::utils::strings::generate_random_string;
 
 #[post("/images", data = "<data>")]
-pub async fn upload_image(content_type: &ContentType, data: Data<'_>) -> Result<Created<()>, String> {
-    // let bytes = data.open(20.megabytes()).into_bytes().await.unwrap();
-    // println!("{:?}", String::from_utf8_lossy(&bytes));
+pub async fn upload_image(
+    user: AuthenticatedUser,
+    content_type: &ContentType, 
+    data: Data<'_>
+) -> Result<Created<()>, CustomError> {
+    user.check_artist()?;
 
     let options = MultipartFormDataOptions::with_multipart_form_data_fields(vec![
         MultipartFormDataField::raw("image")
             .size_limit(20000000)
             .content_type_by_string(Some(mime::IMAGE_STAR))
-            .unwrap(),
+            .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal server error".into()))))?
     ]);
-
-    let start_time = Instant::now();
 
     let multipart_form_data = MultipartFormData::parse(content_type, data, options)
         .await
-        .unwrap();
-
-    let end_time = Instant::now();
-    println!("Phase 1: {} milliseconds", (end_time - start_time).as_millis());
+        .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("cannot parse multipart data".into()))))?;
 
     let image_fields = multipart_form_data.raw.get("image");
 
@@ -39,15 +39,11 @@ pub async fn upload_image(content_type: &ContentType, data: Data<'_>) -> Result<
         let file_field = &file_fields[0]; // Because we only put one "photo" field to the allowed_fields, the max length of this file_fields is 1.
         &file_field.raw
     } else {
-        unimplemented!("add error info");
+        return Err(Custom(Status::BadRequest, Json(ErrorInfo::new("image field not found".into()))));
     };
 
-    println!("Phase 1.5: {} milliseconds", (end_time - start_time).as_millis());
-
-    let img = image::load_from_memory(raw_image).expect("not image");
-
-    let end_time = Instant::now();
-    println!("Phase 2: {} milliseconds", (end_time - start_time).as_millis());
+    let img = image::load_from_memory(raw_image)
+        .map_err(|_| Custom(Status::BadRequest, Json(ErrorInfo::new("provided file type is not supported".into()))))?;
 
     let resized_img = if img.width() > 720 {
         let ratio = 720.0 / img.width() as f32;
@@ -55,18 +51,13 @@ pub async fn upload_image(content_type: &ContentType, data: Data<'_>) -> Result<
     } else {
         img.to_owned()
     };
-    // let resized_img = img;
 
-    let end_time = Instant::now();
-    println!("Phase 3: {} milliseconds", (end_time - start_time).as_millis());
+    let filename = generate_random_string(16);
     
-    let mut file = File::create("output.webp").unwrap();
+    let mut file = File::create(format!("images/{}", filename))
+        .map_err(|_| Custom(Status::BadRequest, Json(ErrorInfo::new("internal server error".into()))))?;
 
     resized_img.write_to(&mut file, image::ImageOutputFormat::WebP).unwrap();
 
-    let end_time = Instant::now();
-    println!("Phase 4: {} milliseconds", (end_time - start_time).as_millis());
-
-
-    Ok(Created::new("good"))
+    Ok(Created::new(format!("images/{}", filename)))
 }
