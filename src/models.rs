@@ -56,6 +56,7 @@ pub struct Good {
     pub description: Option<String>,
     pub price: Option<i32>,
     pub category_id: i32,
+    pub image_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -65,6 +66,9 @@ pub struct FullGood {
     pub name: Option<String>,
     pub description: Option<String>,
     pub price: Option<i32>,
+    pub image_name: Option<String>,
+    pub circle_id: i32,
+    pub circle_name: Option<String>,
     pub category: Category,
     pub characters: Vec<CharacterWithReference>,
 }

@@ -109,6 +109,8 @@ diesel::table! {
         description -> Nullable<Text>,
         price -> Nullable<Int4>,
         category_id -> Int4,
+        #[max_length = 16]
+        image_name -> Nullable<Bpchar>,
     }
 }
 

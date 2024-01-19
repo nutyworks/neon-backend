@@ -17,6 +17,7 @@ pub struct NewGood {
     pub description: Option<String>,
     pub price: Option<i32>,
     pub category_id: i32,
+    pub image_name: Option<String>,
 }
 
 #[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
@@ -26,6 +27,7 @@ pub struct UpdateGood {
     pub description: Option<String>,
     pub price: Option<i32>,
     pub category_id: Option<i32>,
+    pub image_name: Option<String>,
 }
 
 #[derive(Insertable)]
@@ -131,9 +133,22 @@ pub fn get_goods(
 
     Ok(Json(goods.iter().map(|good: &Good| {
         use crate::schema::categories;
+        use crate::schema::circles;
+        use crate::schema::circle_goods;
         use crate::schema::goods_character;
         use crate::schema::characters;
         use crate::schema::refs;
+
+        let circle_id = circle_goods::table
+            .filter(circle_goods::goods_id.eq(good.id))
+            .select(circle_goods::circle_id)
+            .first::<i32>(&mut conn)
+            .unwrap();
+
+        let circle_name = circles::table.find(circle_id)
+            .select(circles::name)
+            .first::<Option<String>>(&mut conn)
+            .unwrap();
 
         let category = categories::table
             .filter(categories::id.eq(good.category_id))
@@ -153,6 +168,9 @@ pub fn get_goods(
             name: good.name.clone(), 
             description: good.description.clone(), 
             price: good.price, 
+            image_name: good.image_name.clone(),
+            circle_name,
+            circle_id,
             category, 
             characters
         }
