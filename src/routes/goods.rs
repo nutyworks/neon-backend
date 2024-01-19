@@ -244,12 +244,6 @@ pub fn delete_goods(
 
     user.check_permission(circle_id)?;
 
-    diesel::delete(
-        circle_goods::dsl::circle_goods.filter(circle_goods::dsl::goods_id.eq(goods_id)),
-    )
-    .execute(&mut conn)
-    .map_err(handle_error)?;
-
     let size = diesel::delete(goods.find(goods_id))
         .execute(&mut conn)
         .map_err(handle_error)?;
