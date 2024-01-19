@@ -1,8 +1,9 @@
 use rocket::fs::NamedFile;
 use rocket::response::status::{Created, Custom};
+use rocket::response::Responder;
 
 use rocket::http::{ContentType, Status};
-use rocket::Data;
+use rocket::{Data, response, Request, Response};
 
 use rocket::serde::json::Json;
 use rocket_multipart_form_data::{
@@ -14,6 +15,16 @@ use std::fs::File;
 use crate::error_handler::{ErrorInfo, CustomError};
 use crate::models::AuthenticatedUser;
 use crate::utils::strings::generate_random_string;
+
+pub(crate) struct CachedFile(NamedFile);
+
+impl<'r> Responder<'r, 'static> for CachedFile {
+    fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+        Response::build_from(self.0.respond_to(req)?)
+            .raw_header("Cache-control", "max-age=86400") //  24h (24*60*60)
+            .ok()
+    }
+}
 
 #[post("/images", data = "<data>")]
 pub async fn upload_image(
@@ -67,7 +78,7 @@ pub async fn upload_image(
 }
 
 #[get("/images/<filename>")]
-pub async fn get_image(filename: String) -> Result<NamedFile, CustomError> {
+pub async fn get_image(filename: String) -> Result<CachedFile, CustomError> {
     let is_valid_filename = filename.chars().all(|c| 
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".contains(c))
         && filename.len() == 16;
@@ -79,6 +90,7 @@ pub async fn get_image(filename: String) -> Result<NamedFile, CustomError> {
     Ok(
         NamedFile::open(format!("images/{}/{}.webp", &filename[..2], filename))
             .await
-            .map_err(|_| Custom(Status::NotFound, Json(ErrorInfo::new("file not found".into()))))?
+            .map_err(|_| Custom(Status::NotFound, Json(ErrorInfo::new("file not found".into()))))
+            .map(|file| CachedFile(file))?
     )
 }
