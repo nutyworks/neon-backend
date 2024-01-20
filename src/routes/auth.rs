@@ -548,6 +548,13 @@ struct NewTwitterId {
     pub twitter_id: String,
 }
 
+#[derive(Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::user_circles)]
+struct NewUserCircle {
+    pub user_id: i32,
+    pub circle_id: i32,
+}
+
 #[get("/oauth/twitter?<code>&<state>")]
 pub async fn check_twitter_oauth(
     state: String,
@@ -555,6 +562,9 @@ pub async fn check_twitter_oauth(
     pool: &rocket::State<DbPool>,
 ) -> Result<Redirect, CustomError> {
     use crate::schema::users;
+    use crate::schema::user_circles;
+    use crate::schema::circle_artists;
+    use crate::schema::artists;
 
     dotenv().ok();
     let base_url = env::var("BASE_URL").expect("BASE_URL not set");
@@ -601,6 +611,30 @@ pub async fn check_twitter_oauth(
             .map_err(|_| Custom(Status::InternalServerError, Json(ErrorInfo::new("internal_server_error".into()))))?;
 
         let twitter_id = response["data"]["username"].as_str().unwrap().to_string();
+
+        let participating_circles = artists::table
+            .filter(artists::account_url.eq_any(vec![
+                format!("https://twitter.com/{}", twitter_id),
+                format!("https://twitter.com/{}/", twitter_id),
+                format!("https://x.com/{}", twitter_id),
+                format!("https://x.com/{}/", twitter_id),
+            ]))
+            .inner_join(circle_artists::table.on(artists::id.eq(circle_artists::artist_id)))
+            .select(circle_artists::circle_id)
+            .load::<i32>(&mut conn)
+            .map_err(handle_error)?;
+
+        let user_id = users::table.filter(users::oauth_state.eq(&state))
+            .select(users::id)
+            .first::<i32>(&mut conn)
+            .map_err(handle_error)?;
+
+        for circle_id in participating_circles {
+            diesel::insert_into(user_circles::table)
+                .values(NewUserCircle { user_id, circle_id })
+                .execute(&mut conn)
+                .map_err(handle_error)?;
+        }
 
         diesel::update(users::table)
             .filter(users::oauth_state.eq(&state))
