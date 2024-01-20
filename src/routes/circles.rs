@@ -1,5 +1,5 @@
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::AuthenticatedUser;
+use crate::models::{AuthenticatedUser, LinkTypeEnum};
 use crate::{models::Circle, DbPool};
 
 use diesel::prelude::*;
@@ -60,6 +60,28 @@ pub fn get_circle_by_id(
         .first(&mut conn)
         .map(Json)
         .map_err(handle_error)
+}
+
+#[get("/circles/has_prepayment")]
+pub fn get_circles_with_prepayment(
+    pool: &rocket::State<DbPool>,
+) -> Result<Json<Vec<Circle>>, CustomError> {
+    use crate::schema::circles;
+    use crate::schema::circle_links;
+    use crate::schema::links;
+
+    let mut conn = pool.get().expect("Failed to get database connection");
+
+    let circles = links::table
+        .filter(links::type_.eq(LinkTypeEnum::prepayment))
+        .inner_join(circle_links::table.on(links::id.eq(circle_links::link_id)))
+        .inner_join(circles::table.on(circle_links::circle_id.eq(circles::id)))
+        .distinct()
+        .select(circles::all_columns)
+        .load::<Circle>(&mut conn)
+        .map_err(handle_error)?;
+
+    Ok(Json(circles))
 }
 
 #[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]

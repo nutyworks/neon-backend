@@ -27,7 +27,7 @@ use routes::categories::{
 use routes::characters::{
     delete_character, get_character_by_id, get_characters, patch_character, post_character,
 };
-use routes::circles::{delete_circle, get_circle_by_id, get_circles, patch_circle, post_circle};
+use routes::circles::{get_circles_with_prepayment, delete_circle, get_circle_by_id, get_circles, patch_circle, post_circle};
 use routes::goods::{
     delete_good_character, delete_goods, get_goods, get_goods_by_id, patch_goods,
     post_circle_goods, post_good_character,
@@ -102,6 +102,7 @@ fn rocket() -> _ {
                 get_artists,
                 get_artist_by_id,
                 post_artist,
+                get_circles_with_prepayment,
                 post_circle_artist,
                 patch_artist,
                 delete_artist,
