@@ -142,6 +142,7 @@ diesel::table! {
         #[max_length = 255]
         url -> Varchar,
         name -> Nullable<Varchar>,
+        expire -> Nullable<Timestamp>,
     }
 }
 

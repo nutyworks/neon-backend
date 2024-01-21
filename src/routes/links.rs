@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
 use crate::models::{AuthenticatedUser, Link, LinkTypeEnum};
 use crate::DbPool;
@@ -22,6 +24,7 @@ pub struct NewLink {
     pub type_: LinkTypeEnum,
     pub url: String,
     pub name: Option<String>,
+    pub expire: Option<SystemTime>,
 }
 
 #[derive(Queryable, Selectable, Insertable, Deserialize, AsChangeset)]
@@ -31,6 +34,7 @@ pub struct UpdateLink {
     pub type_: Option<LinkTypeEnum>,
     pub url: Option<String>,
     pub name: Option<String>,
+    pub expire: Option<SystemTime>,
 }
 
 #[post("/circles/<circle_id>/links", format = "json", data = "<new_link>")]

@@ -140,6 +140,7 @@ pub struct Link {
     pub type_: LinkTypeEnum,
     pub url: String,
     pub name: Option<String>,
+    pub expire: Option<SystemTime>,
 }
 
 #[derive(Queryable)]

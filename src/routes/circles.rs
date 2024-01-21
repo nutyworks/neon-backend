@@ -1,12 +1,19 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
+
 use crate::error_handler::{handle_error, CustomError, ErrorInfo};
-use crate::models::{AuthenticatedUser, LinkTypeEnum};
+use crate::models::{AuthenticatedUser, LinkTypeEnum, Link};
+use crate::schema::sql_types::LinkType;
 use crate::{models::Circle, DbPool};
 
+use diesel::dsl::sql;
 use diesel::prelude::*;
+use diesel::sql_types::{Integer, Text, Nullable, Timestamp};
 use rocket::http::Status;
 use rocket::response::status::{Created, Custom};
 use rocket::serde::json::Json;
 use rocket::serde::Deserialize;
+use serde::Serialize;
 
 #[get("/circles?<name>&<artist_name>&<location>")]
 pub fn get_circles(
@@ -62,24 +69,77 @@ pub fn get_circle_by_id(
         .map_err(handle_error)
 }
 
+#[derive(Queryable)]
+pub struct CircleLinkRecord {
+    pub circle_id: i32,
+    pub circle_name: Option<String>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub link_id: i32,
+    pub link_name: Option<String>,
+    pub link_type: LinkTypeEnum,
+    pub link_url: String,
+    pub link_expire: Option<SystemTime>,
+}
+
+#[derive(Serialize)]
+pub struct CircleLinks {
+    pub id: i32,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub links: Vec<Link>,
+}
+
 #[get("/circles/has_prepayment")]
 pub fn get_circles_with_prepayment(
     pool: &rocket::State<DbPool>,
-) -> Result<Json<Vec<Circle>>, CustomError> {
+) -> Result<Json<Vec<CircleLinks>>, CustomError> {
     use crate::schema::circles;
     use crate::schema::circle_links;
     use crate::schema::links;
 
     let mut conn = pool.get().expect("Failed to get database connection");
 
-    let circles = links::table
+    let records = links::table
         .filter(links::type_.eq(LinkTypeEnum::prepayment))
         .inner_join(circle_links::table.on(links::id.eq(circle_links::link_id)))
         .inner_join(circles::table.on(circle_links::circle_id.eq(circles::id)))
-        .distinct()
-        .select(circles::all_columns)
-        .load::<Circle>(&mut conn)
+        .select((
+            sql::<Integer>("circles.id"),
+            sql::<Nullable<Text>>("circles.name"),
+            sql::<Nullable<Text>>("circles.description"),
+            sql::<Nullable<Text>>("circles.location"),
+            sql::<Integer>("links.id"),
+            sql::<Nullable<Text>>("links.name"),
+            sql::<LinkType>("links.type"),
+            sql::<Text>("links.url"),
+            sql::<Nullable<Timestamp>>("links.expire"),
+        ))
+        .load::<CircleLinkRecord>(&mut conn)
         .map_err(handle_error)?;
+
+    let mut cl = HashMap::new();
+
+    for record in records {
+        let entry = cl.entry(record.circle_id).or_insert(CircleLinks {
+            id: record.circle_id,
+            name: record.circle_name,
+            description: record.description,
+            location: record.location,
+            links: vec![],
+        });
+
+        entry.links.append(&mut vec![Link { 
+            id: record.link_id,
+            name: record.link_name,
+            type_: record.link_type,
+            url: record.link_url,
+            expire: record.link_expire,
+        }]);
+    }
+
+    let circles = cl.into_values().collect();
 
     Ok(Json(circles))
 }
